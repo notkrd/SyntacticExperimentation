@@ -9,7 +9,7 @@ import qualified Data.Set as Set
 
 data WordCat =
     NA
-  | PrimativeCat (Set String)
+  | PrimitiveCat (Set String)
   | RSlashCat {r_targ_cat :: WordCat, r_arg_cat :: WordCat, r_kinds :: Set String}
   | LSlashCat {l_targ_cat :: WordCat, l_arg_cat :: WordCat, l_kinds :: Set String}
     deriving (Eq, Ord)
@@ -20,17 +20,26 @@ data WordCat =
 (@\@) :: WordCat -> WordCat -> WordCat
 (@\@) cat_a cat_b = LSlashCat cat_a cat_b Set.empty
 
+addLabels :: Set String -> WordCat -> WordCat
+addLabels _ NA = NA
+addLabels more_labels (PrimitiveCat some_labels) =
+  PrimitiveCat (some_labels `Set.union` more_labels)
+addLabels more_labels (RSlashCat a b some_labels) =
+  RSlashCat a b (some_labels `Set.union` more_labels)
+addLabels more_labels (LSlashCat a b some_labels) =
+  LSlashCat a b (some_labels `Set.union` more_labels)
+
 s, n, np, pp :: WordCat
-s = PrimativeCat (Set.singleton "S"); n = PrimativeCat (Set.singleton "N");
-np = PrimativeCat (Set.singleton "NP"); pp = PrimativeCat (Set.singleton "PP"); 
+s = PrimitiveCat (Set.singleton "S"); n = PrimitiveCat (Set.singleton "N");
+np = PrimitiveCat (Set.singleton "NP"); pp = PrimitiveCat (Set.singleton "PP"); 
 
 labels :: WordCat -> Set String
-labels (PrimativeCat lbls) = lbls
+labels (PrimitiveCat lbls) = lbls
 labels (RSlashCat _ _ lbls) = lbls
 labels (LSlashCat _ _ lbls) = lbls
 
 (#%) :: WordCat -> WordCat -> Bool -- True if the first category contains the second
-(#%) (PrimativeCat c) (PrimativeCat d) = Set.isSubsetOf c d
+(#%) (PrimitiveCat c) (PrimitiveCat d) = Set.isSubsetOf c d
 (#%) (RSlashCat targ_a arg_a kinds_a) (RSlashCat targ_b arg_b kinds_b)
   | Set.isSubsetOf kinds_a kinds_b && arg_a #% arg_b && targ_a #% targ_b = True
   | otherwise = False
@@ -54,10 +63,14 @@ labels (LSlashCat _ _ lbls) = lbls
 (?+?) :: WordCat -> WordCat -> Bool
 (?+?) cat_a cat_b = cat_a #+# cat_b /= NA
 
-type Phrase = (String, WordCat)
+type Phrase = ([String], WordCat)
 
 (@+@) :: Phrase -> Phrase -> Phrase
-(@+@) (word_a, cat_a) (word_b, cat_b) = (word_a ++ " " ++ word_b, cat_a #+# cat_b)
+(@+@) (phrase_a, cat_a) (phrase_b, cat_b) = (phrase_a ++ phrase_b, cat_a #+# cat_b)
+
+phrasesOfCat :: Set String -> [Phrase] -> [Phrase]
+phrasesOfCat some_kind all_phrases =
+  filter (\phr -> Set.isSubsetOf some_kind (labels (snd phr))) all_phrases
 
 newPhrases :: [Phrase] -> [Phrase]
 newPhrases all_phrases =
@@ -68,27 +81,38 @@ gensOfPhrases :: Integer -> [Phrase] -> [Phrase]
 gensOfPhrases 0 all_phrases = all_phrases
 gensOfPhrases n all_phrases = gensOfPhrases (n - 1) (all_phrases ++ (newPhrases all_phrases))
 
-makeSentencesGens :: Integer -> [Phrase] -> [String]
-makeSentencesGens n all_phrases = map fst (filter (\phr -> Set.member "S" (labels (snd phr)))
+makeSentencesGens :: Integer -> [Phrase] -> [[String]]
+makeSentencesGens n all_phrases = map fst (phrasesOfCat (Set.singleton "S")
                                            (gensOfPhrases n all_phrases))
 
 some_words :: [Phrase]
-some_words = [("Jane",np),
-              ("road", n),
-              ("map", n),
-              ("a", np @/@ n),
-              ("the", np @/@ n),
-              ("is", s @\@ np),
-              ("inscribes", (s @\@ np) @/@ np),
-              ("map to", n @/@ np)]
+some_words = [(["Jane"],np),
+              (["road"], n),
+              (["map"], n),
+              (["a"], np @/@ n),
+              (["the"], np @/@ n),
+              (["is"], s @\@ np),
+              (["inscribes"], (s @\@ np) @/@ np),
+              (["map","to"], n @/@ np)]
 
 other_words :: [Phrase]
-other_words = [("the", np @/@ n),
-               ("some", np @/@ n),
-               ("CEO", n),
-               ("bird", n),
-               ("and elsewhere", (s @/@ s) @\@ s),
-               ("breathes", s @\@ np),
-               ("flies", s @\@ np)]
+other_words = [(["the"], np @/@ n),
+               (["some"], np @/@ n),
+               (["CEO"], n),
+               (["bird"], n),
+               (["and elsewhere"], (s @/@ s) @\@ s),
+               (["breathes"], s @\@ np),
+               (["flies"], s @\@ np)]
+
+more_words :: [Phrase]
+more_words = [(["mouth"], n),
+              (["machine"], n),
+              (["meanings"], np),
+              (["this"], np @/@ n),
+              (["that"], np @/@ n),
+              (["watches"], (s @\@ np) @/@ np),
+              (["follows"], ((s @\@ np) @/@ pp) @/@ np),
+              (["into"], pp @/@ np)]
+
 
 \end{code}
