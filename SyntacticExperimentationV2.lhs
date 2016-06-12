@@ -4,6 +4,7 @@
 
 module SyntacticExperimentationV2 where
 
+import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -28,6 +29,15 @@ addLabels more_labels (RSlashCat a b some_labels) =
   RSlashCat a b (some_labels `Set.union` more_labels)
 addLabels more_labels (LSlashCat a b some_labels) =
   LSlashCat a b (some_labels `Set.union` more_labels)
+
+addString :: String -> WordCat -> WordCat
+addString _ NA = NA
+addString new_label (PrimitiveCat some_labels) =
+  PrimitiveCat (new_label `Set.insert` some_labels)
+addString new_label (RSlashCat a b some_labels) =
+  RSlashCat a b (new_label `Set.insert` some_labels)
+addString new_label (LSlashCat a b some_labels) =
+  LSlashCat a b (new_label `Set.insert` some_labels)
 
 s, n, np, pp :: WordCat
 s = PrimitiveCat (Set.singleton "S"); n = PrimitiveCat (Set.singleton "N");
@@ -81,8 +91,8 @@ gensOfPhrases :: Integer -> [Phrase] -> [Phrase]
 gensOfPhrases 0 all_phrases = all_phrases
 gensOfPhrases n all_phrases = gensOfPhrases (n - 1) (all_phrases ++ (newPhrases all_phrases))
 
-makeSentencesGens :: Integer -> [Phrase] -> [[String]]
-makeSentencesGens n all_phrases = map fst (phrasesOfCat (Set.singleton "S")
+makeSentencesGens :: Integer -> [Phrase] -> [String]
+makeSentencesGens n all_phrases = map (concat . (intersperse " ") . fst) (phrasesOfCat (Set.singleton "S")
                                            (gensOfPhrases n all_phrases))
 
 some_words :: [Phrase]
@@ -114,5 +124,32 @@ more_words = [(["mouth"], n),
               (["follows"], ((s @\@ np) @/@ pp) @/@ np),
               (["into"], pp @/@ np)]
 
+place, agent :: WordCat
+place = addString "place" n; agent = addString "agent" np;
+just_place = addString "just place" place
+
+city_words :: [Phrase]
+city_words = [(["city"], (addString "vague" just_place)),
+              (["bakeries"], addString "occupants" np),
+              (["pet","cats"], addString "occupants" np),
+              (["living"], just_place @/@ (addString "vague" just_place)),
+              (["dead"], just_place @/@ (addString  "vague" just_place)),
+              (["the"], (addString "place" np) @/@ n),
+              (["walks"], ((addString "simple" (addString "travel" s)) @\@ agent)
+               @/@ (addString "destination" pp)),
+              (["surrounds"], ((addString "simple" (addString "description" s))
+                               @\@ (addString "place" np))
+               @/@ agent),
+              (["mechanically"], (s @\@ agent)
+               @/@ ((addString "simple" s) @\@ agent)),
+              (["and"], (s @\@ (addString "travel" s)) @/@ (addString "description" s)),
+              (["with"], (place @\@ just_place) @/@ (addString "possession" pp)),
+              (["its"], (addString "possession" pp) @/@ (addString "occupants" np)),
+              (["into"], (addString "destination" pp) @/@ (addString "place" np)),
+              (["through"], (addString "destination" pp) @/@ (addString "place" np)),
+              (["Quinn"], agent)]
+
+game_words :: [Phrase]
+game_words = []
 
 \end{code}
